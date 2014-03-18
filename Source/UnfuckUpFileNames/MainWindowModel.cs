@@ -93,6 +93,7 @@ namespace UnfuckUpFileNames
 
             Task filesFound = findFiles.ContinueWith((parm) => {
                 this.FoundItems = this._tempList;
+                this.ExecuteFileRenameCommand.RaiseCanExecute();
             }, TaskScheduler.FromCurrentSynchronizationContext());
 
             findFiles.Start();
@@ -133,11 +134,29 @@ namespace UnfuckUpFileNames
 
         public void ExecuteFileRename()
         {
+            var checkedItems = (from item in this.FoundItems
+                                where item.Selected
+                                select item).ToList();
 
+            foreach (var item in checkedItems)
+            {
+                File.Move(item.OldFileName, item.NewFileName);
+            }
         }
+
         public bool ExecuteFileRenameCanExecute()
         {
-            return false;
+            bool cool = false;
+
+            if (!string.IsNullOrWhiteSpace(this.FilePath) && Directory.Exists(this.FilePath))
+            {
+                if (!string.IsNullOrWhiteSpace(this.Pattern))
+                {
+                    cool = true;
+                }
+            }
+
+            return cool;
         }
     }
 }
