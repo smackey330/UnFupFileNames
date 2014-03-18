@@ -24,7 +24,12 @@ namespace UnfuckUpFileNames
                 this.RaisePropertyChanged("Selected");
             }
         }
+
         public string OldFileName { get; set; }
         public string NewFileName { get; set; }
+
+        public string OldFullPath { get; set; }
+        public string NewFullPath { get; set; }
+        public string FolderPath { get; set; }
     }
 }

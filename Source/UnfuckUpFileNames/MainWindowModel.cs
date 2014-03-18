@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Windows.Data;
 using System.Windows.Forms;
 using System.Windows.Input;
 using UnfuckUpFileNames.UiInfrastructure;
@@ -18,9 +19,12 @@ namespace UnfuckUpFileNames
         private CommandBase _FindPathCommand;
         private CommandBase _FindBadFilesCommand;
         private CommandBase _ExecuteFileRenameCommand;
-        private List<FileItem> _foundItems;
+        private ListCollectionView _foundItems;
         private string _filePath;
         private string _pattern;
+        private bool _recurseSubFolders = true;
+        private bool _showWaiting;
+        private bool _allChecked = true;
 
         public MainWindowModel(MainWindow v)
         {
@@ -36,13 +40,52 @@ namespace UnfuckUpFileNames
         public CommandBase FindBadFilesCommand { get { return this._FindBadFilesCommand; } }
         public CommandBase ExecuteFileRenameCommand { get { return this._ExecuteFileRenameCommand; } }
 
-        public string FilePath 
+        public bool AllChecked
+        {
+            get { return this._allChecked; }
+            set
+            {
+                this._allChecked = value;
+
+                foreach (var item in this.FoundItems.OfType<FileItem>())
+                {
+                    item.Selected = value;
+                }
+
+                this.RaisePropertyChanged("FoundItems");
+                this.RaisePropertyChanged("AllChecked");
+            }
+        }
+
+        public bool ShowWaiting
+        {
+            get { return this._showWaiting; }
+            set
+            {
+                this._showWaiting = value;
+                this.RaisePropertyChanged("ShowWaiting");
+            }
+        }
+
+        public bool RecurseSubFolders
+        {
+            get { return this._recurseSubFolders; }
+            set
+            {
+                this._recurseSubFolders = value;
+                this.RaisePropertyChanged("RecurseSubFolders");
+            }
+        }
+
+        public string FilePath
         {
             get { return this._filePath; }
             set
             {
                 this._filePath = value;
                 this.RaisePropertyChanged("FilePath");
+                this.ExecuteFileRenameCommand.RaiseCanExecute();
+                this.FindBadFilesCommand.RaiseCanExecute();
             }
         }
         public string Pattern
@@ -52,9 +95,11 @@ namespace UnfuckUpFileNames
             {
                 this._pattern = value;
                 this.RaisePropertyChanged("Pattern");
+                this.ExecuteFileRenameCommand.RaiseCanExecute();
+                this.FindBadFilesCommand.RaiseCanExecute();
             }
         }
-        public List<FileItem> FoundItems 
+        public ListCollectionView FoundItems 
         {
             get { return this._foundItems; }
             set
@@ -83,6 +128,9 @@ namespace UnfuckUpFileNames
         public void FindBadFiles()
         {
             _patRegEx = new Regex(this.Pattern, RegexOptions.IgnoreCase);
+            this.ExecuteFileRenameCommand.RaiseCanExecute();
+            this.FindBadFilesCommand.RaiseCanExecute();
+            this.ShowWaiting = true;
 
             Task findFiles = new Task(() =>
             {
@@ -91,10 +139,18 @@ namespace UnfuckUpFileNames
                 FindFiles(di);
             });
 
+
             Task filesFound = findFiles.ContinueWith((parm) => {
-                this.FoundItems = this._tempList;
+
+                ListCollectionView col = new ListCollectionView(this._tempList);
+                col.GroupDescriptions.Add(new PropertyGroupDescription("FolderPath"));
+
                 this.ExecuteFileRenameCommand.RaiseCanExecute();
+                this.FoundItems = col;
+                this.ShowWaiting = false;
+
             }, TaskScheduler.FromCurrentSynchronizationContext());
+
 
             findFiles.Start();
         }
@@ -105,15 +161,22 @@ namespace UnfuckUpFileNames
             {
                 if (_patRegEx.IsMatch(fi.FullName)){
                     FileItem item = new FileItem();
-                    item.OldFileName = fi.FullName;
-                    item.NewFileName = _patRegEx.Replace(fi.FullName, string.Empty);
+                    item.OldFullPath = fi.FullName;
+                    item.NewFullPath = _patRegEx.Replace(fi.FullName, string.Empty);
+                    item.OldFileName = fi.Name;
+                    item.NewFileName = _patRegEx.Replace(fi.Name, string.Empty);
+                    item.FolderPath = currentDirectory.FullName;
+
                     this._tempList.Add(item);
                 }
             }
 
-            foreach (DirectoryInfo di in currentDirectory.GetDirectories())
+            if (RecurseSubFolders)
             {
-                FindFiles(di);
+                foreach (DirectoryInfo di in currentDirectory.GetDirectories())
+                {
+                    FindFiles(di);
+                }
             }
         }
 
@@ -134,14 +197,20 @@ namespace UnfuckUpFileNames
 
         public void ExecuteFileRename()
         {
-            var checkedItems = (from item in this.FoundItems
+            this.ShowWaiting = true;
+            var checkedItems = (from item in this.FoundItems.SourceCollection.OfType<FileItem>()
                                 where item.Selected
-                                select item).ToList();
+                                select item);
 
-            foreach (var item in checkedItems)
+            ParallelOptions options = new ParallelOptions();
+            options.MaxDegreeOfParallelism = 2;
+
+            Parallel.ForEach(checkedItems, options, (FileItem item) =>
             {
-                File.Move(item.OldFileName, item.NewFileName);
-            }
+                File.Move(item.OldFullPath, item.NewFullPath);
+            });
+
+            this.ShowWaiting = false;
         }
 
         public bool ExecuteFileRenameCanExecute()
