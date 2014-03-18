@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Data;
 using System.Windows.Forms;
@@ -15,10 +16,12 @@ namespace UnfuckUpFileNames
 {
     public class MainWindowModel : NotifyObject
     {
+        private CancellationTokenSource _cancellationToken;
         private MainWindow view;
         private CommandBase _FindPathCommand;
         private CommandBase _FindBadFilesCommand;
         private CommandBase _ExecuteFileRenameCommand;
+        private CommandBase _CancelActionCommand;
         private ListCollectionView _foundItems;
         private string _filePath;
         private string _pattern;
@@ -33,12 +36,14 @@ namespace UnfuckUpFileNames
             _FindPathCommand = new CommandBase(FindPath);
             _FindBadFilesCommand = new CommandBase(this.FindBadFiles, this.FindBadFilesCanExecute);
             _ExecuteFileRenameCommand = new CommandBase(this.ExecuteFileRename, this.ExecuteFileRenameCanExecute);
+            _CancelActionCommand = new CommandBase(this.CancelAction, this.CancelActionCanExecute);
             this.Pattern = ConfigurationManager.AppSettings["DefaultPattern"];
        }
 
         public CommandBase FindPathCommand { get { return this._FindPathCommand; } }
         public CommandBase FindBadFilesCommand { get { return this._FindBadFilesCommand; } }
         public CommandBase ExecuteFileRenameCommand { get { return this._ExecuteFileRenameCommand; } }
+        public CommandBase CancelActionCommand { get { return this._CancelActionCommand; } }
 
         public bool AllChecked
         {
@@ -64,6 +69,7 @@ namespace UnfuckUpFileNames
             {
                 this._showWaiting = value;
                 this.RaisePropertyChanged("ShowWaiting");
+                this.CancelActionCommand.RaiseCanExecute();
             }
         }
 
@@ -125,11 +131,22 @@ namespace UnfuckUpFileNames
         private List<FileItem> _tempList;
         private Regex _patRegEx;
 
+        public void CancelAction()
+        {
+            this._cancellationToken.Cancel();
+            //this._cancellationToken.Token.CanBeCanceled
+        }
+        public bool CancelActionCanExecute()
+        {
+            return this._cancellationToken != null;
+        }
+
         public void FindBadFiles()
         {
             _patRegEx = new Regex(this.Pattern, RegexOptions.IgnoreCase);
             this.ExecuteFileRenameCommand.RaiseCanExecute();
             this.FindBadFilesCommand.RaiseCanExecute();
+            _cancellationToken = new CancellationTokenSource();
             this.ShowWaiting = true;
 
             Task findFiles = new Task(() =>
@@ -137,7 +154,7 @@ namespace UnfuckUpFileNames
                 _tempList = new List<FileItem>();
                 DirectoryInfo di = new DirectoryInfo(this.FilePath);
                 FindFiles(di);
-            });
+            }, _cancellationToken.Token);
 
 
             Task filesFound = findFiles.ContinueWith((parm) => {
@@ -148,6 +165,7 @@ namespace UnfuckUpFileNames
                 this.ExecuteFileRenameCommand.RaiseCanExecute();
                 this.FoundItems = col;
                 this.ShowWaiting = false;
+                _cancellationToken = null;
 
             }, TaskScheduler.FromCurrentSynchronizationContext());
 
@@ -157,6 +175,11 @@ namespace UnfuckUpFileNames
 
         public void FindFiles(DirectoryInfo currentDirectory)
         {
+            if (this._cancellationToken != null && this._cancellationToken.IsCancellationRequested)
+            {
+                this._cancellationToken.Token.ThrowIfCancellationRequested();
+            }
+
             foreach (FileInfo fi in currentDirectory.GetFiles().ToList())
             {
                 if (_patRegEx.IsMatch(fi.FullName)){
