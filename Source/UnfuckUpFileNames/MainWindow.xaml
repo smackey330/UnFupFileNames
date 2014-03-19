@@ -23,7 +23,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" />
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="150"/>
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -35,7 +35,7 @@
 
             <TextBlock Text="File Path:" Grid.Column="0" Grid.Row="0" />
             <TextBox Text="{Binding FilePath, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Grid.Row="0" />
-            <Button Command="{Binding FindPathCommand}" Content="Browse" Grid.Column="2" Grid.Row="0" />
+            <Button Command="{Binding FindPathCommand}" Content="Browse" Grid.Column="2" Grid.Row="0" Margin="0,5,0,5" />
 
             <TextBlock Text="Pattern:" Grid.Column="0" Grid.Row="1" />
             <TextBox Text="{Binding Pattern, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Grid.Row="1" />
@@ -104,13 +104,14 @@
 
         <Grid Visibility="{Binding ShowWaiting, Converter={StaticResource boolToVisConverter}}" Background="Gray" Opacity="0.5">
         </Grid>
+        
         <Grid Visibility="{Binding ShowWaiting, Converter={StaticResource boolToVisConverter}}" Height="250" Width="550" Background="White">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Label Content="Please wait... Loading your Fed up files...." VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Row="0" />
-            <Button Content="Cancel" Command="{Binding CancelActionCommand}" Grid.Row="1" />
+            <Button Content="Cancel" Command="{Binding CancelActionCommand}" Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,30" />
         </Grid>
     </Grid>
     
