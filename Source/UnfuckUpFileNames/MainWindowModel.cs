@@ -185,7 +185,8 @@ namespace UnfuckUpFileNames
                 if (_patRegEx.IsMatch(fi.FullName)){
                     FileItem item = new FileItem();
                     item.OldFullPath = fi.FullName;
-                    item.NewFullPath = _patRegEx.Replace(fi.FullName, string.Empty);
+                    item.NewFullPath = Path.Combine(currentDirectory.FullName, _patRegEx.Replace(fi.Name, string.Empty));
+                        //_patRegEx.Replace(fi.FullName, string.Empty);
                     item.OldFileName = fi.Name;
                     item.NewFileName = _patRegEx.Replace(fi.Name, string.Empty);
                     item.FolderPath = currentDirectory.FullName;
