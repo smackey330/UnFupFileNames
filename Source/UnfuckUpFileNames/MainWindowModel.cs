@@ -28,6 +28,7 @@ namespace UnfuckUpFileNames
         private bool _recurseSubFolders = true;
         private bool _showWaiting;
         private bool _allChecked = true;
+        private bool _allReadyRenamed = false;
 
         public MainWindowModel(MainWindow v)
         {
@@ -162,6 +163,7 @@ namespace UnfuckUpFileNames
                 ListCollectionView col = new ListCollectionView(this._tempList);
                 col.GroupDescriptions.Add(new PropertyGroupDescription("FolderPath"));
 
+                this._allReadyRenamed = false;
                 this.ExecuteFileRenameCommand.RaiseCanExecute();
                 this.FoundItems = col;
                 this.ShowWaiting = false;
@@ -182,13 +184,15 @@ namespace UnfuckUpFileNames
 
             foreach (FileInfo fi in currentDirectory.GetFiles().ToList())
             {
-                if (_patRegEx.IsMatch(fi.FullName)){
+                if (_patRegEx.IsMatch(fi.Name))
+                {
                     FileItem item = new FileItem();
                     item.OldFullPath = fi.FullName;
                     item.NewFullPath = Path.Combine(currentDirectory.FullName, _patRegEx.Replace(fi.Name, string.Empty));
-                        //_patRegEx.Replace(fi.FullName, string.Empty);
+
                     item.OldFileName = fi.Name;
                     item.NewFileName = _patRegEx.Replace(fi.Name, string.Empty);
+                  
                     item.FolderPath = currentDirectory.FullName;
 
                     this._tempList.Add(item);
@@ -235,13 +239,17 @@ namespace UnfuckUpFileNames
             });
 
             this.ShowWaiting = false;
+            _allReadyRenamed = true;
+
+            this.FindBadFilesCommand.RaiseCanExecute();
+            this.ExecuteFileRenameCommand.RaiseCanExecute();
         }
 
         public bool ExecuteFileRenameCanExecute()
         {
             bool cool = false;
 
-            if (!string.IsNullOrWhiteSpace(this.FilePath) && Directory.Exists(this.FilePath))
+            if (!string.IsNullOrWhiteSpace(this.FilePath) && Directory.Exists(this.FilePath) && !this._allReadyRenamed)
             {
                 if (!string.IsNullOrWhiteSpace(this.Pattern))
                 {
