@@ -16,6 +16,7 @@ namespace UnfuckUpFileNames
 {
     public class MainWindowModel : NotifyObject
     {
+        private string _logFileName = "log-" + DateTime.Now.ToString("yyyy.MM.dd-hh.mm.ss") + ".log";
         private CancellationTokenSource _cancellationToken;
         private MainWindow view;
         private CommandBase _FindPathCommand;
@@ -235,7 +236,14 @@ namespace UnfuckUpFileNames
 
             Parallel.ForEach(checkedItems, options, (FileItem item) =>
             {
-                File.Move(item.OldFullPath, item.NewFullPath);
+                try
+                {
+                    File.Move(item.OldFullPath, item.NewFullPath);
+                }
+                catch (Exception ex)
+                {
+                    WriteLog("Error", ex);
+                }
             });
 
             this.ShowWaiting = false;
@@ -258,6 +266,18 @@ namespace UnfuckUpFileNames
             }
 
             return cool;
+        }
+
+        private void WriteLog(string message)
+        {
+            using (StreamWriter sw = new StreamWriter(_logFileName, true))
+            {
+                sw.WriteLineAsync(message);
+            }
+        }
+        private void WriteLog(string message, Exception ex)
+        {
+            WriteLog(message + " :: " + ex.ToString());
         }
     }
 }
